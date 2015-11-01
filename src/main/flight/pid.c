@@ -108,7 +108,6 @@ static void pidLuxFloat(pidProfile_t *pidProfile, controlRateConfig_t *controlRa
     float dT;
     int axis;
 	bool forceAngle = false;
-	int32_t deltaAngle = 0;
     float horizonLevelStrength = 1;
 
     dT = (float)cycleTime * 0.000001f;
@@ -155,8 +154,6 @@ static void pidLuxFloat(pidProfile_t *pidProfile, controlRateConfig_t *controlRa
 #endif
 
             if (ABS(inclination.raw[axis] - angleTrim->raw[axis]) > max_angle_inclination)
-            	forceAngle = true;
-            if (deltaAngle > 0)
             	forceAngle = true;
 
             if (FLIGHT_MODE(ANGLE_MODE)) {
