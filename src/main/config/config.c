@@ -324,8 +324,8 @@ static void resetControlRateConfig(controlRateConfig_t *controlRateConfig) {
 }
 
 void resetRcControlsConfig(rcControlsConfig_t *rcControlsConfig) {
-    rcControlsConfig->deadband = 0;
-    rcControlsConfig->yaw_deadband = 0;
+    rcControlsConfig->deadband = 5;
+    rcControlsConfig->yaw_deadband = 5;
     rcControlsConfig->alt_hold_deadband = 40;
     rcControlsConfig->alt_hold_fast_change = 1;
 }
