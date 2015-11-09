@@ -44,6 +44,7 @@ typedef enum {
     PID_CONTROLLER_MULTI_WII_23,
     PID_CONTROLLER_MULTI_WII_HYBRID,
     PID_CONTROLLER_HARAKIRI,
+    PID_CONTROLLER_MY_FLIGHT,
 } pidControllerType_e;
 
 #define IS_PID_CONTROLLER_FP_BASED(pidController) (pidController == 2)
