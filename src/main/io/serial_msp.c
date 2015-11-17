@@ -134,7 +134,7 @@ void useRcControlsConfig(modeActivationCondition_t *modeActivationConditions, es
 #define MSP_PROTOCOL_VERSION                0
 
 #define API_VERSION_MAJOR                   1 // increment when major changes are made
-#define API_VERSION_MINOR                   13 // increment when any change is made, reset to zero when major changes are released after changing API_VERSION_MAJOR
+#define API_VERSION_MINOR                   14 // increment when any change is made, reset to zero when major changes are released after changing API_VERSION_MAJOR
 
 #define API_VERSION_LENGTH                  2
 
@@ -280,6 +280,7 @@ static const char * const boardIdentifier = TARGET_BOARD_IDENTIFIER;
 #define MSP_SERVO_CONFIGURATIONS 120    //out message         All servo configurations.
 #define MSP_NAV_STATUS           121    //out message         Returns navigation status
 #define MSP_NAV_CONFIG           122    //out message         Returns navigation parameters
+#define MSP_3D                   124    //out message         Settings needed for reversible ESCs
 
 #define MSP_SET_RAW_RC           200    //in message          8 rc chan
 #define MSP_SET_RAW_GPS          201    //in message          fix, numsat, lat, lon, alt, speed
@@ -296,6 +297,7 @@ static const char * const boardIdentifier = TARGET_BOARD_IDENTIFIER;
 #define MSP_SET_SERVO_CONFIGURATION 212    //in message          Servo settings
 #define MSP_SET_MOTOR            214    //in message          PropBalance function
 #define MSP_SET_NAV_CONFIG       215    //in message          Sets nav config parameters - write to the eeprom
+#define MSP_SET_3D               217    //in message          Settings needed for reversible ESCs
 
 // #define MSP_BIND                 240    //in message          no param
 
@@ -1278,6 +1280,14 @@ static bool processOutCommand(uint8_t cmdMSP)
         serialize32(0); // future exp
         break;
 
+    case MSP_3D:
+        headSerialReply(2 * 4);
+        serialize16(masterConfig.flight3DConfig.deadband3d_low);
+        serialize16(masterConfig.flight3DConfig.deadband3d_high);
+        serialize16(masterConfig.flight3DConfig.neutral3d);
+        serialize16(masterConfig.flight3DConfig.deadband3d_throttle);
+        break;
+
     default:
         return false;
     }
@@ -1498,6 +1508,13 @@ static bool processInCommand(void)
             loadCustomServoMixer();
         }
 #endif
+        break;
+
+    case MSP_SET_3D:
+        masterConfig.flight3DConfig.deadband3d_low = read16();
+        masterConfig.flight3DConfig.deadband3d_high = read16();
+        masterConfig.flight3DConfig.neutral3d = read16();
+        masterConfig.flight3DConfig.deadband3d_throttle = read16();
         break;
         
     case MSP_RESET_CONF:
@@ -1756,13 +1773,32 @@ static bool processInCommand(void)
                 headSerialReply(0);
                 tailSerialReply();
                 // wait for all data to send
-                while (!isSerialTransmitBufferEmpty(mspSerialPort)) {
-                    delay(50);
-                }
+                waitForSerialPortToFinishTransmitting(currentPort->port);
                 // Start to activate here
                 // motor 1 => index 0
+                
+                // search currentPort portIndex
+                /* next lines seems to be unnecessary, because the currentPort always point to the same mspPorts[portIndex]
+                uint8_t portIndex;	
+				for (portIndex = 0; portIndex < MAX_MSP_PORT_COUNT; portIndex++) {
+					if (currentPort == &mspPorts[portIndex]) {
+						break;
+					}
+				}
+				*/
+                mspReleasePortIfAllocated(mspSerialPort); // CloseSerialPort also marks currentPort as UNUSED_PORT
                 usb1WirePassthrough(i);
-                // MPS uart is active again
+                // Wait a bit more to let App read the 0 byte and switch baudrate
+                // 2ms will most likely do the job, but give some grace time
+                delay(10);
+                // rebuild/refill currentPort structure, does openSerialPort if marked UNUSED_PORT - used ports are skiped
+                mspAllocateSerialPorts(&masterConfig.serialConfig);
+                /* restore currentPort and mspSerialPort
+                setCurrentPort(&mspPorts[portIndex]); // not needed same index will be restored
+                */ 
+                // former used MSP uart is active again
+                // restore MSP_SET_1WIRE as current command for correct headSerialReply(0)
+                currentPort->cmdMSP = MSP_SET_1WIRE;
             } else {
                 // ESC channel higher than max. allowed
                 // rem: BLHeliSuite will not support more than 8
